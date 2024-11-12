@@ -50,8 +50,8 @@ def analyze_sentiment(comments, text):
 
     return sentiment
 
-sentiment = analyze_sentiment(comments, 'ukraine')
+sentiment = analyze_sentiment(comments, 'trump')
 
-sentiment.to_csv("ukraine_sentiment.csv")
+sentiment.to_csv("trump_sentiment.csv")
 
 

@@ -28,7 +28,7 @@
     </style>
 </head>
 <body>
-    <h2>Weekly Average Sentiment</h2>
+    <h2 id="chart-title">Weekly Average Sentiment - Palestine</h2>
 
     <label for="dataset-select">Choose a topic:</label>
     <select id="dataset-select">
@@ -40,6 +40,13 @@
     <div id="chart"></div>
     <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
     <script>
+        const titleElement = document.getElementById("chart-title");
+        const selectElement = document.getElementById("dataset-select");
+
+        selectElement.addEventListener("change", () => {
+            const topic = selectElement.options[selectElement.selectedIndex].text;
+            titleElement.textContent = `Weekly Average Sentiment - ${topic}`;
+        });
         const margin = { top: 20, right: 30, bottom: 50, left: 50 },
               width = 960 - margin.left - margin.right,
               height = 500 - margin.top - margin.bottom;
