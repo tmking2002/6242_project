@@ -193,6 +193,16 @@
             return d;
         }).then(data => {
             const nestedData = d3.groups(data, d => d.date);  // Group by week
+
+            comments_bag = {}
+            const comments = nestedData.map(([date, values]) => {
+                comments_bag[date] = []
+                values.forEach(val => {
+                    comments_bag[date].push(val["comment"])
+                }) 
+            })
+            console.log("comments_bag: ", comments_bag)
+
             const weeklyAverageData = nestedData.map(([date, values]) => {
                 const weeklyAverages = { date: new Date(date), totalComments: values.length };  // Track total comments
                 let emotions = Object.keys(values[0]).filter(key => key !== "created" && key !== "comment" && key !== "date");
