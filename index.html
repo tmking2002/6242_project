@@ -65,6 +65,8 @@
 
         const tooltip = d3.select("#tooltip");
 
+        const date = null;
+
         // Function to update the chart based on the selected dataset
         function updateChart(dataset) {
             d3.csv(dataset, d => {
@@ -145,20 +147,20 @@
                 
                 tooltip.style("opacity", 1);
 
-                const [xPos] = d3.pointer(event, svg.node());
-                const date = x.invert(xPos);
+                // const [xPos] = d3.pointer(event, svg.node());
+                // const date = x.invert(xPos);
 
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                const words = comments_bag[closestWeek.date];  // Fetch comments for the closest week
+                // const closestWeek = findClosestWeek(date, weeklyAverageData);
+                // const words = comments_bag[closestWeek.date];  // Fetch comments for the closest week
 
-                if (words) {
-                    console.log("generateWordCloud")
-                    generateWordCloud(words);
-                    wordCloudDiv
-                        .style("opacity", 1)
-                        // .style("left", `${event.pageX + 15}px`)
-                        // .style("top", `${event.pageY - 30}px`);
-                }
+                // if (words) {
+                //     console.log("generateWordCloud")
+                //     generateWordCloud(words);
+                //     wordCloudDiv
+                //         .style("opacity", 1)
+                //         // .style("left", `${event.pageX + 15}px`)
+                //         // .style("top", `${event.pageY - 30}px`);
+                // }
             })
             .on("mousemove", (event, d) => {
                 const [xPos] = d3.pointer(event, svg.node());
@@ -172,6 +174,8 @@
                 const emotion = d.key;
                 const score = dataAtDate ? dataAtDate[emotion] : 0;
                 const totalComments = dataAtDate ? dataAtDate.totalComments : 0;  // Get the total comments for the week
+                const words = comments_bag[closestWeek.date];  // Fetch comments for the closest week
+
 
                 tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
                         <strong>Emotion:</strong> ${emotion}<br>
@@ -179,6 +183,14 @@
                         <strong>Total Comments:</strong> ${totalComments}`)
                     .style("left", (event.pageX + 15) + "px")
                     .style("top", (event.pageY - 30) + "px");
+                if (words && closestWeek != date) {
+                    console.log("generateWordCloud")
+                    generateWordCloud(words);
+                    wordCloudDiv
+                        .style("opacity", 1)
+                        // .style("left", `${event.pageX + 15}px`)
+                        // .style("top", `${event.pageY - 30}px`);
+                }
             })
             .on("mouseout", () => {
                 tooltip.style("opacity", 0);
