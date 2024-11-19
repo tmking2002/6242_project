@@ -2,3 +2,12 @@
 worldnews_comments.csv
 worldnews_comments.pkl
 reddit_data.pkl
+pinecone_key.txt
+hugging_face_token.txt
+test.py
+embeddings/embeddings_1.pkl
+embeddings/embeddings_2.pkl
+embeddings/embeddings_3.pkl
+embeddings/embeddings_4.pkl
+test.py
+find_topics.ipynb
