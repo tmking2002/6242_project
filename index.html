@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Daily Average Sentiment - Area Chart with Tooltip</title>
+    <title>Weekly Average Sentiment</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
@@ -40,279 +40,141 @@
     <div id="chart"></div>
     <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
     <script>
-        const titleElement = document.getElementById("chart-title");
-        const selectElement = document.getElementById("dataset-select");
-
-        selectElement.addEventListener("change", () => {
-            const topic = selectElement.options[selectElement.selectedIndex].text;
-            titleElement.textContent = `Weekly Average Sentiment - ${topic}`;
-        });
         const margin = { top: 20, right: 30, bottom: 50, left: 50 },
-              width = 960 - margin.left - margin.right,
-              height = 500 - margin.top - margin.bottom;
-
+          width = 960 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom;
+      
         const svg = d3.select("#chart")
-                      .append("svg")
-                      .attr("width", width + margin.left + margin.right)
-                      .attr("height", height + margin.top + margin.bottom)
-                      .append("g")
-                      .attr("transform", `translate(${margin.left},${margin.top})`);
-
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+      
         const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
-        const formatDate = d3.timeFormat("%Y-%m-%d");
-
+      
         const tooltip = d3.select("#tooltip");
-
-        // Function to update the chart based on the selected dataset
+      
+        const color = d3.scaleOrdinal()
+          .domain(["positive", "negative"])
+          .range(["green", "red"]);
+      
+        const x = d3.scaleTime().range([0, width]);
+        const y = d3.scaleLinear().range([height, 0]);
+      
+        const stack = d3.stack().order(d3.stackOrderNone).offset(d3.stackOffsetNone);
+      
+        const area = d3.area()
+          .x(d => x(d.data.date))
+          .y0(d => y(d[0]))
+          .y1(d => y(d[1]));
+      
+        // Add legend
+        const legend = svg.append("g")
+          .attr("class", "legend")
+          .attr("transform", `translate(${width + 20}, 20)`);
+      
+        legend.selectAll("rect")
+          .data(color.domain())
+          .enter()
+          .append("rect")
+          .attr("x", 0)
+          .attr("y", (d, i) => i * 20)
+          .attr("width", 18)
+          .attr("height", 18)
+          .style("fill", color);
+      
+        legend.selectAll("text")
+          .data(color.domain())
+          .enter()
+          .append("text")
+          .attr("x", 25)
+          .attr("y", (d, i) => i * 20 + 14)
+          .text(d => d)
+          .style("font-size", "12px");
+      
+        function findClosestWeek(targetDate, data) {
+          return data.reduce((a, b) => 
+            Math.abs(a.date - targetDate) < Math.abs(b.date - targetDate) ? a : b
+          );
+        }
+      
         function updateChart(dataset) {
-            d3.csv(dataset, d => {
+          d3.csv(dataset, d => {
             d.created = parseDate(d.created);
-            d.date = d3.timeWeek.floor(d.created);  // Set the date to the start of the week
+            d.date = d3.timeWeek.floor(d.created);
             for (let key in d) {
-                if (key !== "created" && key !== "comment" && key !== "date") {
+              if (key !== "created" && key !== "comment" && key !== "date") {
                 d[key] = +d[key];
-                }
+              }
             }
             return d;
-            }).then(data => {
-            const nestedData = d3.groups(data, d => d.date);  // Group by week
-            const weeklyAverageData = nestedData.map(([date, values]) => {
-                const weeklyAverages = { date: new Date(date), totalComments: values.length };  // Track total comments
-                let emotions = Object.keys(values[0]).filter(key => key !== "created" && key !== "comment" && key !== "date");
-
-                // filter out neutral emotion
-                emotions = emotions.filter(emotion => emotion !== "neutral");
-
-                // Calculate the total sum of all emotions for the week
-                const total = d3.sum(values, d => d3.sum(emotions, emotion => d[emotion]));
-
-                // Normalize each emotion by dividing by the total sum
-                emotions.forEach(emotion => {
-                weeklyAverages[emotion] = total > 0 ? d3.sum(values, d => d[emotion]) / total : 0;
-                });
-                return weeklyAverages;
+          }).then(data => {
+            const weeklyData = d3.groups(data, d => d.date).map(([date, values]) => {
+              const emotions = Object.keys(values[0]).filter(
+                key => !["created", "comment", "date", "neutral"].includes(key)
+              );
+              const total = d3.sum(values, d => d3.sum(emotions, e => d[e]));
+              const averages = { date: new Date(date), totalComments: values.length };
+              emotions.forEach(e => {
+                averages[e] = total > 0 ? d3.sum(values, d => d[e]) / total : 0;
+              });
+              return averages;
             });
-
-            const emotions = Object.keys(weeklyAverageData[0]).filter(d => d !== "date" && d !== "totalComments");
-
-            const x = d3.scaleTime()
-                    .domain(d3.extent(weeklyAverageData, d => d.date))
-                    .range([0, width]);
-
-            const y = d3.scaleLinear()
-                    .domain([0, 1])  // Since the values are now normalized, the y-axis will range from 0 to 1
-                    .range([height, 0]);
-
-            const color = d3.scaleOrdinal()
-                    .domain(emotions)
-                    .range(d3.schemeCategory10);
-
-            const area = d3.area()
-                    .x(d => x(d.data.date))
-                    .y0(d => y(d[0]))
-                    .y1(d => y(d[1]));
-
-            const stack = d3.stack()
-                    .keys(emotions)
-                    .order(d3.stackOrderNone)
-                    .offset(d3.stackOffsetNone);
-
-            const stackedData = stack(weeklyAverageData);
-
+      
+            const emotions = Object.keys(weeklyData[0]).filter(d => d !== "date" && d !== "totalComments");
+      
+            x.domain(d3.extent(weeklyData, d => d.date));
+            y.domain([0, 1]);
+      
+            const stackedData = stack.keys(emotions)(weeklyData);
+      
             svg.selectAll(".area").remove();
-
             svg.selectAll(".area")
-            .data(stackedData)
-            .enter().append("path")
-            .attr("class", "area")
-            .attr("d", area)
-            .attr("fill", d => color(d.key))
-            .on("mouseover", (event, d) => {
-                tooltip.style("opacity", 1);
-            })
-            .on("mousemove", (event, d) => {
+              .data(stackedData)
+              .enter().append("path")
+              .attr("class", "area")
+              .attr("d", area)
+              .attr("fill", d => color(d.key))
+              .on("mouseover", (event, d) => tooltip.style("opacity", 1))
+              .on("mousemove", (event, d) => {
                 const [xPos] = d3.pointer(event, svg.node());
                 const date = x.invert(xPos);
-
-                // Find the closest week to the hovered date
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
-
-                const dataAtDate = closestWeek;
+                const closest = findClosestWeek(date, weeklyData);
                 const emotion = d.key;
-                const score = dataAtDate ? dataAtDate[emotion] : 0;
-                const totalComments = dataAtDate ? dataAtDate.totalComments : 0;  // Get the total comments for the week
-
-                tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
-                        <strong>Emotion:</strong> ${emotion}<br>
-                        <strong>Score:</strong> ${score.toFixed(2)}<br>
-                        <strong>Total Comments:</strong> ${totalComments}`)
-                    .style("left", (event.pageX + 15) + "px")
-                    .style("top", (event.pageY - 30) + "px");
-            })
-            .on("mouseout", () => {
-                tooltip.style("opacity", 0);
-            });
-
+                const score = closest ? closest[emotion] : 0;
+                const totalComments = closest ? closest.totalComments : 0;
+                tooltip.html(`
+                  <strong>Date:</strong> ${d3.timeFormat("%Y-%m-%d")(closest.date)}<br>
+                  <strong>Sentiment:</strong> ${emotion}<br>
+                  <strong>Score:</strong> ${score.toFixed(2)}<br>
+                  <strong>Total Comments:</strong> ${totalComments}`)
+                  .style("left", `${event.pageX + 15}px`)
+                  .style("top", `${event.pageY - 30}px`);
+              })
+              .on("mouseout", () => tooltip.style("opacity", 0));
+      
             svg.select(".x-axis").remove();
+            svg.append("g")
+              .attr("class", "x-axis")
+              .attr("transform", `translate(0,${height})`)
+              .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1)))
+              .selectAll("text")
+              .attr("transform", "rotate(-45)")
+              .style("text-anchor", "end");
+      
             svg.select(".y-axis").remove();
-
             svg.append("g")
-            .attr("class", "x-axis")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1))) // Adjust the ticks to show weeks
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-0.8em")
-            .attr("dy", "0.15em")
-            .attr("transform", "rotate(-45)");
-
-            svg.append("g")
-            .attr("class", "y-axis")
-            .call(d3.axisLeft(y));
-            });
+              .attr("class", "y-axis")
+              .call(d3.axisLeft(y));
+          });
         }
-
-        // Initial chart load
+      
+        d3.select("#dataset-select").on("change", function () {
+          updateChart(this.value);
+        });
+      
         updateChart("palestine_sentiment.csv");
-
-        // Update chart when a new dataset is selected
-        d3.select("#dataset-select").on("change", function() {
-            const selectedDataset = d3.select(this).property("value");
-            updateChart(selectedDataset);
-        });
-
-        d3.csv("palestine_sentiment.csv", d => {
-            d.created = parseDate(d.created);
-            d.date = d3.timeWeek.floor(d.created);  // Set the date to the start of the week
-            for (let key in d) {
-                if (key !== "created" && key !== "comment" && key !== "date") {
-                    d[key] = +d[key];
-                }
-            }
-            return d;
-        }).then(data => {
-            const nestedData = d3.groups(data, d => d.date);  // Group by week
-            const weeklyAverageData = nestedData.map(([date, values]) => {
-                const weeklyAverages = { date: new Date(date), totalComments: values.length };  // Track total comments
-                let emotions = Object.keys(values[0]).filter(key => key !== "created" && key !== "comment" && key !== "date");
-
-                // filter out neutral emotion
-                emotions = emotions.filter(emotion => emotion !== "neutral");
-
-                // Calculate the total sum of all emotions for the week
-                const total = d3.sum(values, d => d3.sum(emotions, emotion => d[emotion]));
-
-                // Normalize each emotion by dividing by the total sum
-                emotions.forEach(emotion => {
-                    weeklyAverages[emotion] = total > 0 ? d3.sum(values, d => d[emotion]) / total : 0;
-                });
-                return weeklyAverages;
-            });
-
-            const emotions = Object.keys(weeklyAverageData[0]).filter(d => d !== "date" && d !== "totalComments");
-
-            const x = d3.scaleTime()
-                        .domain(d3.extent(weeklyAverageData, d => d.date))
-                        .range([0, width]);
-
-            const y = d3.scaleLinear()
-                        .domain([0, 1])  // Since the values are now normalized, the y-axis will range from 0 to 1
-                        .range([height, 0]);
-
-            const color = d3.scaleOrdinal()
-                            .domain(emotions)
-                            .range(d3.schemeCategory10);
-
-            const area = d3.area()
-                        .x(d => x(d.data.date))
-                        .y0(d => y(d[0]))
-                        .y1(d => y(d[1]));
-
-            const stack = d3.stack()
-                            .keys(emotions)
-                            .order(d3.stackOrderNone)
-                            .offset(d3.stackOffsetNone);
-
-            const stackedData = stack(weeklyAverageData);
-
-            svg.selectAll(".area")
-            .data(stackedData)
-            .enter().append("path")
-            .attr("class", "area")
-            .attr("d", area)
-            .attr("fill", d => color(d.key))
-            .on("mouseover", (event, d) => {
-                tooltip.style("opacity", 1);
-            })
-            .on("mousemove", (event, d) => {
-                const [xPos] = d3.pointer(event, svg.node());
-                const date = x.invert(xPos);
-
-                // Find the closest week to the hovered date
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
-
-                const dataAtDate = closestWeek;
-                const emotion = d.key;
-                const score = dataAtDate ? dataAtDate[emotion] : 0;
-                const totalComments = dataAtDate ? dataAtDate.totalComments : 0;  // Get the total comments for the week
-
-                tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
-                                <strong>Emotion:</strong> ${emotion}<br>
-                                <strong>Score:</strong> ${score.toFixed(2)}<br>
-                                <strong>Total Comments:</strong> ${totalComments}`)
-                        .style("left", (event.pageX + 15) + "px")
-                        .style("top", (event.pageY - 30) + "px");
-            })
-            .on("mouseout", () => {
-                tooltip.style("opacity", 0);
-            });
-
-            svg.append("g")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1))) // Adjust the ticks to show weeks
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-0.8em")
-            .attr("dy", "0.15em")
-            .attr("transform", "rotate(-45)");
-
-            svg.append("g")
-            .call(d3.axisLeft(y));
-
-            svg.append("text")
-            .attr("class", "axis-label")
-            .attr("x", width / 2)
-            .attr("y", height + margin.bottom - 10)
-            .style("text-anchor", "middle")
-            .text("Week");
-
-            svg.append("text")
-            .attr("class", "axis-label")
-            .attr("transform", "rotate(-90)")
-            .attr("y", -margin.left + 15)
-            .attr("x", -height / 2)
-            .style("text-anchor", "middle")
-            .text("Normalized Sentiment Score");
-        });
-
-        // Function to find the closest week based on the hovered date
-        function findClosestWeek(date, weeklyData) {
-            let closest = weeklyData[0];
-            let minDiff = Math.abs(date - closest.date);
-
-            weeklyData.forEach(week => {
-                const diff = Math.abs(date - week.date);
-                if (diff < minDiff) {
-                    closest = week;
-                    minDiff = diff;
-                }
-            });
-
-            return closest;
-        }
-
-    </script>
-</body>
+      </script>
+    </body>
 </html>
