@@ -2,9 +2,7 @@ import pandas as pd
 from transformers import pipeline
 from tqdm import tqdm
 
-model_id = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
-
-classifier = pipeline("sentiment-analysis", model=model_id)
+classifier = pipeline(task="text-classification", model="SamLowe/roberta-base-go_emotions", top_k=None)
 
 comments = pd.read_pickle('worldnews_comments.pkl')
 comments['score'] = pd.to_numeric(comments['score'], errors='coerce')
@@ -24,6 +22,10 @@ comments = comments.dropna(subset=['og_post'])
 comments['full_text'] = comments['og_post'] + ' ' + comments['body']
 comments.dropna(subset=['full_text'], inplace=True)
 
+def adjust_sentiment_data(sentiment):
+    flattened_data = {item['label']: item['score'] for item in sentiment[0]}
+    return pd.DataFrame([flattened_data])
+
 def analyze_sentiment(comments, text):
     # filter comments to only include those that contain the text regardless of case
     text = text.lower()
@@ -35,8 +37,7 @@ def analyze_sentiment(comments, text):
     for i in tqdm(range(len(comments))):
         try:
             cur_sentiment = classifier(comments['body'].iloc[i])
-
-            cur_sentiment = pd.DataFrame(cur_sentiment)
+            cur_sentiment = adjust_sentiment_data(cur_sentiment)
             cur_sentiment['comment'] = comments['body'].iloc[i]
             cur_sentiment['created'] = pd.to_datetime(comments['created'].iloc[i])
 
@@ -49,20 +50,6 @@ def analyze_sentiment(comments, text):
 
     return sentiment
 
-sentiment = analyze_sentiment(comments, 'ukraine')
+sentiment = analyze_sentiment(comments, 'lebanon')
 
-# first_comment = comments['full_text'].iloc[0]
-# print(first_comment)
-
-# sentiment = classifier(first_comment)
-# print(sentiment)
-
-sentiment["positive"] = sentiment.apply(lambda row: row["score"] if row["label"] == "POSITIVE" else 1 - row["score"], axis=1)
-sentiment["negative"] = sentiment.apply(lambda row: row["score"] if row["label"] == "NEGATIVE" else 1 - row["score"], axis=1)
-
-# Keep only the desired columns
-sentiment = sentiment[["positive", "negative", "comment", "created"]]
-
-sentiment.to_csv("ukraine_sentiment.csv")
-
-
+sentiment.to_csv("lebanon_sentiment.csv")

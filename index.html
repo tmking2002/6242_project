@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Weekly Average Sentiment</title>
+    <link rel="icon" href="logo.png" type="image/png">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
@@ -11,7 +12,7 @@
         .area {
             opacity: 0.7;
         }
-        .tooltip {
+        .area-tooltip {
             position: absolute;
             background-color: white;
             padding: 8px;
@@ -21,13 +22,40 @@
             font-size: 12px;
             color: #333;
         }
-        #chart {
+
+        .line-tooltip {
+            position: absolute;
+            background-color: white;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            color: #333;
+        }
+
+        #chart-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #area-chart {
             display: flex;
             justify-content: center;
             align-items: center;
             height: 500px;
         }
-        h2 {
+
+        #line-chart {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 300px;
+        }
+
+        h2, h4 {
             text-align: center;
         }
         .topic-container {
@@ -40,24 +68,32 @@
     </style>
 </head>
 <body>
-    <h2 id="chart-title">Weekly Average Sentiment - Palestine</h2>
+    <h2 id="chart-title">Weekly Average Sentiment - Biden</h2>
     <div class="topic-container">
         <label for="dataset-select">Choose a topic:</label>
         <select id="dataset-select">
+            <option value="biden_sentiment.csv">Biden</option>
+            <option value="musk_sentiment.csv">Musk</option>
+            <option value="lebanon_sentiment.csv">Lebanon</option>
             <option value="palestine_sentiment.csv">Palestine</option>
-            <option value="ukraine_sentiment.csv">Ukraine</option>
             <option value="trump_sentiment.csv">Trump</option>
+            <option value="ukraine_sentiment.csv">Ukraine</option>
         </select>
     </div>
-    <div id="chart"></div>
-    <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
+    <div id="area-chart"></div>
+    <h4 id="linechart-title">'Biden' Mentions by Week</h4>
+    <div id="line-chart"></div>
+    <div id="area-tooltip" class="area-tooltip" style="opacity: 0;"></div>
+    <div id="line-tooltip" class="line-tooltip" style="opacity: 0;"></div>
     <script>
         const titleElement = document.getElementById("chart-title");
         const selectElement = document.getElementById("dataset-select");
+        const linechart_title = document.getElementById("linechart-title");
 
         selectElement.addEventListener("change", () => {
             const topic = selectElement.options[selectElement.selectedIndex].text;
             titleElement.textContent = `Weekly Average Sentiment - ${topic}`;
+            linechart_title.textContent = `'${topic}' Mentions by Week`;
             updateChart(selectElement.value);
         });
 
@@ -65,7 +101,7 @@
               width = 960 - margin.left - margin.right,
               height = 500 - margin.top - margin.bottom;
 
-        const svg = d3.select("#chart")
+        const svg = d3.select("#area-chart")
                       .append("svg")
                       .attr("width", width + margin.left + margin.right)
                       .attr("height", height + margin.top + margin.bottom)
@@ -73,7 +109,7 @@
                       .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
-        const tooltip = d3.select("#tooltip");
+        const area_tooltip = d3.select("#area-tooltip");
 
         function updateChart(dataset) {
             d3.csv(dataset, d => {
@@ -132,7 +168,7 @@
                        const score = dataAtDate ? dataAtDate[emotion] : 0;
                        const totalComments = dataAtDate ? dataAtDate.totalComments : 0;
 
-                       tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
+                       area_tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
                                      <strong>Emotion:</strong> ${emotion}<br>
                                      <strong>Score:</strong> ${score.toFixed(2)}<br>
                                      <strong>Total Comments:</strong> ${totalComments}<br><br>
@@ -141,7 +177,7 @@
                               .style("top", `${event.pageY - 30}px`)
                               .style("opacity", 1);
                    })
-                   .on("mouseout", () => tooltip.style("opacity", 0))
+                   .on("mouseout", () => area_tooltip.style("opacity", 0))
                    .on("click", (event, d) => {
                        const [xPos] = d3.pointer(event, svg.node());
                        const date = x.invert(xPos);
@@ -182,7 +218,110 @@
             return closest;
         }
 
-        updateChart("palestine_sentiment.csv");
+        updateChart("biden_sentiment.csv");
     </script>
 </body>
 </html>
+<script>
+    const lineChartMargin = { top: 20, right: 30, bottom: 50, left: 50 },
+          lineChartWidth = 960 - lineChartMargin.left - lineChartMargin.right,
+          lineChartHeight = 300 - lineChartMargin.top - lineChartMargin.bottom;
+
+    const lineChartSvg = d3.select("#line-chart")
+                           .append("svg")
+                           .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
+                           .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
+                           .append("g")
+                           .attr("transform", `translate(${lineChartMargin.left},${lineChartMargin.top})`);
+
+    const line_tooltip = d3.select("#line-tooltip");
+
+    function updateLineChart(dataset) {
+        d3.csv(dataset, d => {
+            d.created = parseDate(d.created);
+            d.date = d3.timeWeek.floor(d.created);
+            return d;
+        }).then(data => {
+            const nestedData = d3.groups(data, d => d.date);
+            const weeklyTotalData = nestedData.map(([date, values]) => ({
+                date: new Date(date),
+                totalComments: values.length
+            }));
+
+            const x = d3.scaleTime()
+                        .domain(d3.extent(weeklyTotalData, d => d.date))
+                        .range([0, lineChartWidth]);
+            const y = d3.scaleLinear()
+                        .domain([0, d3.max(weeklyTotalData, d => d.totalComments)])
+                        .range([lineChartHeight, 0]);
+
+            const line = d3.line()
+                           .x(d => x(d.date))
+                           .y(d => y(d.totalComments));
+
+            lineChartSvg.selectAll(".line").remove();
+            lineChartSvg.selectAll(".line-x-axis").remove();
+            lineChartSvg.selectAll(".line-y-axis").remove();
+
+            lineChartSvg.append("path")
+                        .datum(weeklyTotalData)
+                        .attr("class", "line")
+                        .attr("fill", "none")
+                        .attr("stroke", "steelblue")
+                        .attr("stroke-width", 10)
+                        .attr("d", line);
+
+            lineChartSvg.append("rect")
+                        .attr("width", lineChartWidth)
+                        .attr("height", lineChartHeight)
+                        .attr("fill", "none")
+                        .attr("pointer-events", "all")
+                        .on("mousemove", (event) => {
+                            const [xPos] = d3.pointer(event, lineChartSvg.node());
+                            const date = x.invert(xPos);
+                            const closestWeek = findClosestWeek(date, weeklyTotalData);
+                            const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
+
+                            const dataAtDate = closestWeek;
+                            const totalComments = dataAtDate ? dataAtDate.totalComments : 0;
+
+                            line_tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
+                                         <strong>Total Comments:</strong> ${totalComments}`)
+                                  .style("left", `${event.pageX + 15}px`)
+                                  .style("top", `${event.pageY - 30}px`)
+                                  .style("opacity", 1);
+                        })
+                        .on("mouseout", () => line_tooltip.style("opacity", 0));
+
+            lineChartSvg.selectAll(".line").remove();
+            lineChartSvg.selectAll(".line-x-axis").remove();
+            lineChartSvg.selectAll(".line-y-axis").remove();
+
+            lineChartSvg.append("path")
+                        .datum(weeklyTotalData)
+                        .attr("class", "line")
+                        .attr("fill", "none")
+                        .attr("stroke", "steelblue")
+                        .attr("stroke-width", 1.5)
+                        .attr("d", line);
+
+            lineChartSvg.append("g")
+                        .attr("class", "line-x-axis")
+                        .attr("transform", `translate(0,${lineChartHeight})`)
+                        .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1)))
+                        .selectAll("text")
+                        .attr("transform", "rotate(-45)")
+                        .style("text-anchor", "end");
+
+            lineChartSvg.append("g")
+                        .attr("class", "line-y-axis")
+                        .call(d3.axisLeft(y));
+        });
+    }
+
+    selectElement.addEventListener("change", () => {
+        updateLineChart(selectElement.value);
+    });
+
+    updateLineChart("biden_sentiment.csv");
+</script>
