@@ -73,6 +73,7 @@
         <label for="dataset-select">Choose a topic:</label>
         <select id="dataset-select">
             <option value="biden_sentiment.csv">Biden</option>
+            <option value="china_sentiment.csv">China</option>
             <option value="musk_sentiment.csv">Musk</option>
             <option value="lebanon_sentiment.csv">Lebanon</option>
             <option value="palestine_sentiment.csv">Palestine</option>
@@ -185,9 +186,10 @@
                        const weekDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
                        const dataset = selectElement.value;
                        const topic = selectElement.options[selectElement.selectedIndex].text;
+                       const emotion = d.key;
 
                        // Redirect to the wordcloud page with query params
-                       const url = `wordcloud.html?dataset=${dataset}&week=${weekDate}&topic=${topic}`;
+                       const url = `wordcloud.html?dataset=${dataset}&week=${weekDate}&topic=${topic}&emotion=${emotion}`;
                        window.location.href = url;
                    });
 

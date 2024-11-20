@@ -1,7 +1,9 @@
 import pandas as pd
 
-data = pd.read_pickle('worldnews_comments.pkl')
+data = pd.read_csv('palestine_sentiment.csv')
 
-data = pd.DataFrame(data)
+# randomly select half of the rows
 
-print(data.head(5))
+data = data.sample(frac=0.5)
+
+data.to_csv('palesine_sentiment.csv', index=False)
