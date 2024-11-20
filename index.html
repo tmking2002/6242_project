@@ -4,17 +4,12 @@
     <meta charset="UTF-8">
     <title>Weekly Average Sentiment</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3-cloud/build/d3.layout.cloud.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
         }
         .area {
             opacity: 0.7;
-        }
-        .axis-label {
-            font-size: 12px;
-            fill: #333;
         }
         .tooltip {
             position: absolute;
@@ -26,44 +21,36 @@
             font-size: 12px;
             color: #333;
         }
-
         #chart {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 500px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 500px;
         }
-
-        h2, label {
-          text-align: center;
-          display: block;
-          margin: 0 auto;
+        h2 {
+            text-align: center;
         }
-
-        #wordcloud {
-            width: 500px;
-            height: 400px;
-            padding-top: 50px;
-            position: relative;
-            margin: 0 auto;
+        .topic-container {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .topic-container label {
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <h2 id="chart-title">Weekly Average Sentiment - Palestine</h2>
-
-    <label for="dataset-select">Choose a topic:</label>
-    <div style="text-align: center;">
-      <select id="dataset-select">
-        <option value="palestine_sentiment.csv">Palestine</option>
-        <option value="ukraine_sentiment.csv">Ukraine</option>
-        <option value="trump_sentiment.csv">Trump</option>
-      </select>
+    <div class="topic-container">
+        <label for="dataset-select">Choose a topic:</label>
+        <select id="dataset-select">
+            <option value="palestine_sentiment.csv">Palestine</option>
+            <option value="ukraine_sentiment.csv">Ukraine</option>
+            <option value="trump_sentiment.csv">Trump</option>
+        </select>
     </div>
-
     <div id="chart"></div>
     <div id="tooltip" class="tooltip" style="opacity: 0;"></div>
-    <div id="wordcloud"></div>
     <script>
         const titleElement = document.getElementById("chart-title");
         const selectElement = document.getElementById("dataset-select");
@@ -71,7 +58,9 @@
         selectElement.addEventListener("change", () => {
             const topic = selectElement.options[selectElement.selectedIndex].text;
             titleElement.textContent = `Weekly Average Sentiment - ${topic}`;
+            updateChart(selectElement.value);
         });
+
         const margin = { top: 20, right: 30, bottom: 50, left: 50 },
               width = 960 - margin.left - margin.right,
               height = 500 - margin.top - margin.bottom;
@@ -84,315 +73,105 @@
                       .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
-        const formatDate = d3.timeFormat("%Y-%m-%d");
-
         const tooltip = d3.select("#tooltip");
 
-        const date = null;
-
-        // Function to update the chart based on the selected dataset
         function updateChart(dataset) {
-            // Show loading symbol
-            const loadingSymbol = d3.select("body").append("div")
-              .attr("class", "loading-symbol")
-              .style("position", "absolute")
-              .style("top", "50%")
-              .style("left", "50%")
-              .style("transform", "translate(-50%, -50%)")
-              .style("font-size", "24px")
-              .style("color", "white")
-              .style("background-color", "black")
-              .text("Loading...");
-
             d3.csv(dataset, d => {
-            d.created = parseDate(d.created);
-            d.date = d3.timeWeek.floor(d.created);  // Set the date to the start of the week
-            for (let key in d) {
-                if (key !== "created" && key !== "comment" && key !== "date") {
-                d[key] = +d[key];
-                }
-            }
-            return d;
+                d.created = parseDate(d.created);
+                d.date = d3.timeWeek.floor(d.created);
+                return d;
             }).then(data => {
-            let comments = data.map(d => d.comment);
-            // get 2500 random comments
-            comments = comments.slice(0, 2500);
-            console.log("comments: ", comments);
-            generateWordCloud(comments);
-            // Remove loading symbol after data is loaded
-            loadingSymbol.remove();
-
-            const nestedData = d3.groups(data, d => d.date);  // Group by week
-            const weeklyAverageData = nestedData.map(([date, values]) => {
-                const weeklyAverages = { date: new Date(date), totalComments: values.length };  // Track total comments
-                let emotions = Object.keys(values[0]).filter(key => key !== "created" && key !== "comment" && key !== "date");
-
-                // filter out neutral emotion
-                emotions = emotions.filter(emotion => emotion !== "neutral");
-
-                // Calculate the total sum of all emotions for the week
-                const total = d3.sum(values, d => d3.sum(emotions, emotion => d[emotion]));
-
-                // Normalize each emotion by dividing by the total sum
-                emotions.forEach(emotion => {
-                weeklyAverages[emotion] = total > 0 ? d3.sum(values, d => d[emotion]) / total : 0;
+                const nestedData = d3.groups(data, d => d.date);
+                const weeklyAverageData = nestedData.map(([date, values]) => {
+                    const weeklyAverages = { date: new Date(date), totalComments: values.length };
+                    let emotions = Object.keys(values[0]).filter(k => !["created", "comment", "date"].includes(k));
+                    emotions = emotions.filter(e => e !== "neutral");
+                    const total = d3.sum(values, d => d3.sum(emotions, e => d[e]));
+                    emotions.forEach(e => {
+                        weeklyAverages[e] = total > 0 ? d3.sum(values, d => d[e]) / total : 0;
+                    });
+                    return weeklyAverages;
                 });
-                return weeklyAverages;
-            });
 
-            const emotions = Object.keys(weeklyAverageData[0]).filter(d => d !== "date" && d !== "totalComments");
+                const emotions = Object.keys(weeklyAverageData[0]).filter(k => k !== "date" && k !== "totalComments");
+                const x = d3.scaleTime()
+                            .domain(d3.extent(weeklyAverageData, d => d.date))
+                            .range([0, width]);
+                const y = d3.scaleLinear()
+                            .domain([0, 1])
+                            .range([height, 0]);
+                const color = d3.scaleOrdinal(d3.schemeCategory10);
 
-            const x = d3.scaleTime()
-                    .domain(d3.extent(weeklyAverageData, d => d.date))
-                    .range([0, width]);
+                const area = d3.area()
+                               .x(d => x(d.data.date))
+                               .y0(d => y(d[0]))
+                               .y1(d => y(d[1]));
 
-            const y = d3.scaleLinear()
-                    .domain([0, 1])  // Since the values are now normalized, the y-axis will range from 0 to 1
-                    .range([height, 0]);
+                const stack = d3.stack().keys(emotions);
+                const stackedData = stack(weeklyAverageData);
 
-            const color = d3.scaleOrdinal()
-                    .domain(emotions)
-                    .range(d3.schemeCategory10);
+                svg.selectAll(".area").remove();
+                svg.selectAll(".x-axis").remove();
+                svg.selectAll(".y-axis").remove();
 
-            const area = d3.area()
-                    .x(d => x(d.data.date))
-                    .y0(d => y(d[0]))
-                    .y1(d => y(d[1]));
+                svg.selectAll(".area")
+                   .data(stackedData)
+                   .enter()
+                   .append("path")
+                   .attr("class", "area")
+                   .attr("d", area)
+                   .attr("fill", d => color(d.key))
+                   .on("mousemove", (event, d) => {
+                       const [xPos] = d3.pointer(event, svg.node());
+                       const date = x.invert(xPos);
+                       const closestWeek = findClosestWeek(date, weeklyAverageData);
+                       const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
 
-            const stack = d3.stack()
-                    .keys(emotions)
-                    .order(d3.stackOrderNone)
-                    .offset(d3.stackOffsetNone);
+                       const dataAtDate = closestWeek;
+                       const emotion = d.key;
+                       const score = dataAtDate ? dataAtDate[emotion] : 0;
+                       const totalComments = dataAtDate ? dataAtDate.totalComments : 0;
 
-            const stackedData = stack(weeklyAverageData);
+                       tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
+                                     <strong>Emotion:</strong> ${emotion}<br>
+                                     <strong>Score:</strong> ${score.toFixed(2)}<br>
+                                     <strong>Total Comments:</strong> ${totalComments}<br><br>
+                                     Click to view word cloud`)
+                              .style("left", `${event.pageX + 15}px`)
+                              .style("top", `${event.pageY - 30}px`)
+                              .style("opacity", 1);
+                   })
+                   .on("mouseout", () => tooltip.style("opacity", 0))
+                   .on("click", (event, d) => {
+                       const [xPos] = d3.pointer(event, svg.node());
+                       const date = x.invert(xPos);
+                       const closestWeek = findClosestWeek(date, weeklyAverageData);
+                       const weekDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
+                       const dataset = selectElement.value;
+                       const topic = selectElement.options[selectElement.selectedIndex].text;
 
-            // const wordCloudDiv = d3.select("#wordcloud")
-            // .style("position", "absolute")
-            // .style("background-color", "white")
-            // .style("border", "1px solid #ccc")
-            // .style("border-radius", "4px")
-            // .style("padding", "10px")
-            // .style("box-shadow", "0 2px 5px rgba(0,0,0,0.2)")
-            // .style("opacity", 0)
-            // .style("pointer-events", "none");
+                       // Redirect to the wordcloud page with query params
+                       const url = `wordcloud.html?dataset=${dataset}&week=${weekDate}&topic=${topic}`;
+                       window.location.href = url;
+                   });
 
+                svg.append("g")
+                   .attr("class", "x-axis")
+                   .attr("transform", `translate(0,${height})`)
+                   .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1)))
+                   .selectAll("text")
+                   .attr("transform", "rotate(-45)")
+                   .style("text-anchor", "end");
 
-
-            svg.selectAll(".area").remove();
-
-            svg.selectAll(".area")
-            .data(stackedData)
-            .enter().append("path")
-            .attr("class", "area")
-            .attr("d", area)
-            .attr("fill", d => color(d.key))
-            .on("mouseover", (event, d) => {
-                
-                tooltip.style("opacity", 1);
-
-                const [xPos] = d3.pointer(event, svg.node());
-                const date = x.invert(xPos);
-
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                // const words = comments_bag[closestWeek.date];  // Fetch comments for the closest week
-
-                // if (words) {
-                //     console.log("generateWordCloud")
-                //     generateWordCloud(words);
-                //     wordCloudDiv
-                //         .style("opacity", 1)
-                //         // .style("left", `${event.pageX + 15}px`)
-                //         // .style("top", `${event.pageY - 30}px`);
-                // }
-            })
-            .on("mousemove", (event, d) => {
-                const [xPos] = d3.pointer(event, svg.node());
-                const date = x.invert(xPos);
-
-                // Find the closest week to the hovered date
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
-
-                const dataAtDate = closestWeek;
-                const emotion = d.key;
-                const score = dataAtDate ? dataAtDate[emotion] : 0;
-                const totalComments = dataAtDate ? dataAtDate.totalComments : 0;  // Get the total comments for the week
-
-
-                tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
-                        <strong>Emotion:</strong> ${emotion}<br>
-                        <strong>Score:</strong> ${score.toFixed(2)}<br>
-                        <strong>Total Comments:</strong> ${totalComments}`)
-                    .style("left", (event.pageX + 15) + "px")
-                    .style("top", (event.pageY - 30) + "px");
-            })
-            .on("mouseout", () => {
-                tooltip.style("opacity", 0);
-            });
-
-            svg.select(".x-axis").remove();
-            svg.select(".y-axis").remove();
-
-            svg.append("g")
-            .attr("class", "x-axis")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1))) // Adjust the ticks to show weeks
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-0.8em")
-            .attr("dy", "0.15em")
-            .attr("transform", "rotate(-45)");
-
-            svg.append("g")
-            .attr("class", "y-axis")
-            .call(d3.axisLeft(y));
+                svg.append("g")
+                   .attr("class", "y-axis")
+                   .call(d3.axisLeft(y));
             });
         }
 
-        // Initial chart load
-        updateChart("palestine_sentiment.csv");
-
-        // Update chart when a new dataset is selected
-        d3.select("#dataset-select").on("change", function() {
-            const selectedDataset = d3.select(this).property("value");
-            updateChart(selectedDataset);
-        });
-
-        d3.csv("palestine_sentiment.csv", d => {
-            d.created = parseDate(d.created);
-            d.date = d3.timeWeek.floor(d.created);  // Set the date to the start of the week
-            for (let key in d) {
-                if (key !== "created" && key !== "comment" && key !== "date") {
-                    d[key] = +d[key];
-                }
-            }
-            return d;
-        }).then(data => {
-
-            const nestedData = d3.groups(data, d => d.date);  // Group by week
-
-
-            const weeklyAverageData = nestedData.map(([date, values]) => {
-                const weeklyAverages = { date: new Date(date), totalComments: values.length };  // Track total comments
-                let emotions = Object.keys(values[0]).filter(key => key !== "created" && key !== "comment" && key !== "date");
-
-                // filter out neutral emotion
-                emotions = emotions.filter(emotion => emotion !== "neutral");
-
-                // Calculate the total sum of all emotions for the week
-                const total = d3.sum(values, d => d3.sum(emotions, emotion => d[emotion]));
-
-                // Normalize each emotion by dividing by the total sum
-                emotions.forEach(emotion => {
-                    weeklyAverages[emotion] = total > 0 ? d3.sum(values, d => d[emotion]) / total : 0;
-                });
-                return weeklyAverages;
-            });
-
-            const emotions = Object.keys(weeklyAverageData[0]).filter(d => d !== "date" && d !== "totalComments");
-
-            const x = d3.scaleTime()
-                        .domain(d3.extent(weeklyAverageData, d => d.date))
-                        .range([0, width]);
-
-            const y = d3.scaleLinear()
-                        .domain([0, 1])  // Since the values are now normalized, the y-axis will range from 0 to 1
-                        .range([height, 0]);
-
-            const color = d3.scaleOrdinal()
-                            .domain(emotions)
-                            .range(d3.schemeCategory10);
-
-            const area = d3.area()
-                        .x(d => x(d.data.date))
-                        .y0(d => y(d[0]))
-                        .y1(d => y(d[1]));
-
-            const stack = d3.stack()
-                            .keys(emotions)
-                            .order(d3.stackOrderNone)
-                            .offset(d3.stackOffsetNone);
-
-            const stackedData = stack(weeklyAverageData);
-
-            // const wordCloudDiv = d3.select("#wordcloud")
-            // .style("position", "absolute")
-            // .style("background-color", "white")
-            // .style("border", "1px solid #ccc")
-            // .style("border-radius", "4px")
-            // .style("padding", "10px")
-            // .style("box-shadow", "0 2px 5px rgba(0,0,0,0.2)")
-            // .style("opacity", 0)
-            // .style("pointer-events", "none");
-
-
-
-            svg.selectAll(".area")
-            .data(stackedData)
-            .enter().append("path")
-            .attr("class", "area")
-            .attr("d", area)
-            .attr("fill", d => color(d.key))
-            .on("mouseover", (event, d) => {
-                tooltip.style("opacity", 1);
-            })
-            .on("mousemove", (event, d) => {
-                const [xPos] = d3.pointer(event, svg.node());
-                const date = x.invert(xPos);
-
-                // Find the closest week to the hovered date
-                const closestWeek = findClosestWeek(date, weeklyAverageData);
-                const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
-
-                const dataAtDate = closestWeek;
-                const emotion = d.key;
-                const score = dataAtDate ? dataAtDate[emotion] : 0;
-                const totalComments = dataAtDate ? dataAtDate.totalComments : 0;  // Get the total comments for the week
-                tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
-                                <strong>Emotion:</strong> ${emotion}<br>
-                                <strong>Score:</strong> ${score.toFixed(2)}<br>
-                                <strong>Total Comments:</strong> ${totalComments}`)
-                        .style("left", (event.pageX + 15) + "px")
-                        .style("top", (event.pageY - 30) + "px");
-            })
-            .on("mouseout", () => {
-                console.log("Mouseout event triggered!");
-                tooltip.style("opacity", 0);
-            });
-
-            svg.append("g")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1))) // Adjust the ticks to show weeks
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-0.8em")
-            .attr("dy", "0.15em")
-            .attr("transform", "rotate(-45)");
-
-            svg.append("g")
-            .call(d3.axisLeft(y));
-
-            svg.append("text")
-            .attr("class", "axis-label")
-            .attr("x", width / 2)
-            .attr("y", height + margin.bottom - 10)
-            .style("text-anchor", "middle")
-            .text("Week");
-
-            svg.append("text")
-            .attr("class", "axis-label")
-            .attr("transform", "rotate(-90)")
-            .attr("y", -margin.left + 15)
-            .attr("x", -height / 2)
-            .style("text-anchor", "middle")
-            .text("Normalized Sentiment Score");
-        });
-
-        // Function to find the closest week based on the hovered date
         function findClosestWeek(date, weeklyData) {
             let closest = weeklyData[0];
             let minDiff = Math.abs(date - closest.date);
-
             weeklyData.forEach(week => {
                 const diff = Math.abs(date - week.date);
                 if (diff < minDiff) {
@@ -400,101 +179,10 @@
                     minDiff = diff;
                 }
             });
-
             return closest;
         }
 
-        function generateWordCloud(words) {
-            const wordCounts = {};
-            // console.log(words)
-            const stopwords = [
-                "i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", 
-                "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", 
-                "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", 
-                "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", 
-                "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", 
-                "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", 
-                "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", 
-                "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", 
-                "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", 
-                "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", 
-                "don", "should", "https", "http", "now","0o", "0s", "3a", "3b", "3d", "6b", "6o", "a", "a1", "a2", 
-                "a3", "a4", "ab", "able", "about", "above", "abst", "ac", "accordance", "according", "accordingly", 
-                "across", "act", "actually", "ad", "added", "adj", "ae", "af", "affected", "affecting", "affects", 
-                "after", "afterwards", "ag", "again", "against", "ah", "ain", "ain't", "aj", "al", "all", "allow", 
-                "allows", "almost", "alone", "along", "already", "also", "although", "always", "am", "among", "amongst", 
-                "amoungst", "amount", "an", "and", "announce", "another", "any", "anybody", "anyhow", "anymore", 
-                "anyone", "anything", "anyway", "anyways", "anywhere", "ao", "ap", "apart", "apparently", "appear", 
-                "appreciate", "appropriate", "approximately", "ar", "are", "aren", "arent", "aren't", "arise", "around", 
-                "as", "a's", "aside", "ask", "asking", "associated", "at", "au", "auth", "av", "available", "aw", "away", 
-                "awfully", "ax", "ay", "az", "b", "b1", "b2", "b3", "ba", "back", "bc", "bd", "be", "became", "because", 
-                "become", "becomes", "becoming", "been", "before", "beforehand", "begin", "beginning", "beginnings", "begins", 
-                "behind", "being", "believe", "below", "beside", "besides", "best", "better", "between", "beyond", "bi", "bill", 
-                "biol", "bj", "bk", "bl", "bn", "both", "bottom", "bp", "br", "brief", "briefly", "bs", "bt", "bu", "but", "bx", 
-                "by", "c", "c1", "c2", "c3", "ca", "call", "came", "can", "cannot", "cant", "can't", "cause", "causes", "cc", "cd", 
-                "ce", "certain", "certainly", "cf", "cg", "ch", "changes", "ci", "cit", "cj", "cl", "clearly", "cm", "c'mon", "cn", 
-                "co", "com", "come", "comes", "con", "concerning", "consequently", "consider", "considering", "contain", 
-                "containing", "contains", "corresponding", "could", "couldn", "couldnt", "couldn't", "course", "cp", "cq", 
-                "cr", "cry", "cs", "c's", "ct", "cu", "currently", "cv", "cx", "cy", "cz", "d", "d2", "da", "date", "dc", "dd", 
-                "de", "definitely", "describe", "described", "despite", "detail", "df", "di", "did", "didn", "didn't", "different", 
-                "dj", "dk", "dl", "do", "does", "doesn", "doesn't", "doing", "don", "done", "don't", "down", "downwards", "dp", "dr", 
-                "ds", "dt", "du", "due", "during", "dx", "dy", "e", "e2", "e3", "ea", "each", "ec", "ed", "edu", "ee", "ef", "effect",
-                 "eg", "ei", "eight", "eighty", "either", "ej", "el", "eleven", "else", "elsewhere", "em", "empty", "en", "end", 
-                 "ending", "enough", "entirely", "eo", "ep", "eq", "er", "es", "especially", "est", "et", "et-al", "etc", "eu", "ev", 
-                 "even", "ever", "every", "everybody", "everyone", "everything", "everywhere", "ex", "exactly", "example", "except", 
-                 "ey", "f", "f2", "fa", "far", "fc", "few", "ff", "fi", "fifteen", "fifth", "fify", "fill", "find", "fire", "first", 
-                 "five", "fix", "fj", "fl", "fn", "fo", "followed", "following", "follows", "for", "former", "formerly", "forth", 
-                 "forty", "found", "four", "fr", "from", "front", "fs", "ft", "fu", "full", "further", "furthermore", "fy", "g", "ga", "gave", "ge", "get", "gets", "getting", "gi", "give", "given", "gives", "giving", "gj", "gl", "go", "goes", "going", "gone", "got", "gotten", "gr", "greetings", "gs", "gy", "h", "h2", "h3", "had", "hadn", "hadn't", "happens", "hardly", "has", "hasn", "hasnt", "hasn't", "have", "haven", "haven't", "having", "he", "hed", "he'd", "he'll", "hello", "help", "hence", "her", "here", "hereafter", "hereby", "herein", "heres", "here's", "hereupon", "hers", "herself", "hes", "he's", "hh", "hi", "hid", "him", "himself", "his", "hither", "hj", "ho", "home", "hopefully", "how", "howbeit", "however", "how's", "hr", "hs", "http", "hu", "hundred", "hy", "i", "i2", "i3", "i4", "i6", "i7", "i8", "ia", "ib", "ibid", "ic", "id", "i'd", "ie", "if", "ig", "ignored", "ih", "ii", "ij", "il", "i'll", "im", "i'm", "immediate", "immediately", "importance", "important", "in", "inasmuch", "inc", "indeed", "index", "indicate", "indicated", "indicates", "information", "inner", "insofar", "instead", "interest", "into", "invention", "inward", "io", "ip", "iq", "ir", "is", "isn", "isn't", "it", "itd", "it'd", "it'll", "its", "it's", "itself", "iv", "i've", "ix", "iy", "iz", "j", "jj", "jr", "js", "jt", "ju", "just", "k", "ke", "keep", "keeps", "kept", "kg", "kj", "km", "know", "known", "knows", "ko", "l", "l2", "la", "largely", "last", "lately", "later", "latter", "latterly", "lb", "lc", "le", "least", "les", "less", "lest", "let", "lets", "let's", "lf", "like", "liked", "likely", "line", "little", "lj", "ll", "ll", "ln", "lo", "look", "looking", "looks", "los", "lr", "ls", "lt", "ltd", "m", "m2", "ma", "made", "mainly", "make", "makes", "many", "may", "maybe", "me", "mean", "means", "meantime", "meanwhile", "merely", "mg", "might", "mightn", "mightn't", "mill", "million", "mine", "miss", "ml", "mn", "mo", "more", "moreover", "most", "mostly", "move", "mr", "mrs", "ms", "mt", "mu", "much", "mug", "must", "mustn", "mustn't", "my", "myself", "n", "n2", "na", "name", "namely", "nay", "nc", "nd", "ne", "near", "nearly", "necessarily", "necessary", "need", "needn", "needn't", "needs", "neither", "never", "nevertheless", "new", "next", "ng", "ni", "nine", "ninety", "nj", "nl", "nn", "no", "nobody", "non", "none", "nonetheless", "noone", "nor", "normally", "nos", "not", "noted", "nothing", "novel", "now", "nowhere", "nr", "ns", "nt", "ny", "o", "oa", "ob", "obtain", "obtained", "obviously", "oc", "od", "of", "off", "often", "og", "oh", "oi", "oj", "ok", "okay", "ol", "old", "om", "omitted", "on", "once", "one", "ones", "only", "onto", "oo", "op", "oq", "or", "ord", "os", "ot", "other", "others", "otherwise", "ou", "ought", "our", "ours", "ourselves", "out", "outside", "over", "overall", "ow", "owing", "own", "ox", "oz", "p", "p1", "p2", "p3", "page", "pagecount", "pages", "par", "part", "particular", "particularly", "pas", "past", "pc", "pd", "pe", "per", "perhaps", "pf", "ph", "pi", "pj", "pk", "pl", "placed", "please", "plus", "pm", "pn", "po", "poorly", "possible", "possibly", "potentially", "pp", "pq", "pr", "predominantly", "present", "presumably", "previously", "primarily", "probably", "promptly", "proud", "provides", "ps", "pt", "pu", "put", "py", "q", "qj", "qu", "que", "quickly", "quite", "qv", "r", "r2", "ra", "ran", "rather", "rc", "rd", "re", "readily", "really", "reasonably", "recent", "recently", "ref", "refs", "regarding", "regardless", "regards", "related", "relatively", "research", "research-articl", "respectively", "resulted", "resulting", "results", "rf", "rh", "ri", "right", "rj", "rl", "rm", "rn", "ro", "rq", "rr", "rs", "rt", "ru", "run", "rv", "ry", "s", "s2", "sa", "said", "same", "saw", "say", "saying", "says", "sc", "sd", "se", "sec", "second", "secondly", "section", "see", "seeing", "seem", "seemed", "seeming", "seems", "seen", "self", "selves", "sensible", "sent", "serious", "seriously", "seven", "several", "sf", "shall", "shan", "shan't", "she", "shed", "she'd", "she'll", "shes", "she's", "should", "shouldn", "shouldn't", "should've", "show", "showed", "shown", "showns", "shows", "si", "side", "significant", "significantly", "similar", "similarly", "since", "sincere", "six", "sixty", "sj", "sl", "slightly", "sm", "sn", "so", "some", "somebody", "somehow", "someone", "somethan", "something", "sometime", "sometimes", "somewhat", "somewhere", "soon", "sorry", "sp", "specifically", "specified", "specify", "specifying", "sq", "sr", "ss", "st", "still", "stop", "strongly", "sub", "substantially", "successfully", "such", "sufficiently", "suggest", "sup", "sure", "sy", "system", "sz", "t", "t1", "t2", "t3", "take", "taken", "taking", "tb", "tc", "td", "te", "tell", "ten", "tends", "tf", "th", "than", "thank", "thanks", "thanx", "that", "that'll", "thats", "that's", "that've", "the", "their", "theirs", "them", "themselves", "then", "thence", "there", "thereafter", "thereby", "thered", "therefore", "therein", "there'll", "thereof", "therere", "theres", "there's", "thereto", "thereupon", "there've", "these", "they", "theyd", "they'd", "they'll", "theyre", "they're", "they've", "thickv", "thin", "think", "third", "this", "thorough", "thoroughly", "those", "thou", "though", "thoughh", "thousand", "three", "throug", "through", "throughout", "thru", "thus", "ti", "til", "tip", "tj", "tl", "tm", "tn", "to", "together", "too", "took", "top", "toward", "towards", "tp", "tq", "tr", "tried", "tries", "truly", "try", "trying", "ts", "t's", "tt", "tv", "twelve", "twenty", "twice", "two", "tx", "u", "u201d", "ue", "ui", "uj", "uk", "um", "un", "under", "unfortunately", "unless", "unlike", "unlikely", "until", "unto", "uo", "up", "upon", "ups", "ur", "us", "use", "used", "useful", "usefully", "usefulness", "uses", "using", "usually", "ut", "v", "va", "value", "various", "vd", "ve", "ve", "very", "via", "viz", "vj", "vo", "vol", "vols", "volumtype", "vq", "vs", "vt", "vu", "w", "wa", "want", "wants", "was", "wasn", "wasnt", "wasn't", "way", "we", "wed", "we'd", "welcome", "well", "we'll", "well-b", "went", "were", "we're", "weren", "werent", "weren't", "we've", "what", "whatever", "what'll", "whats", "what's", "when", "whence", "whenever", "when's", "where", "whereafter", "whereas", "whereby", "wherein", "wheres", "where's", "whereupon", "wherever", "whether", "which", "while", "whim", "whither", "who", "whod", "whoever", "whole", "who'll", "whom", "whomever", "whos", "who's", "whose", "why", "why's", "wi", "widely", "will", "willing", "wish", "with", "within", "without", "wo", "won", "wonder", "wont", "won't", "words", "world", "would", "wouldn", "wouldnt", "wouldn't", "www", "x", "x1", "x2", "x3", "xf", "xi", "xj", "xk", "xl", "xn", "xo", "xs", "xt", "xv", "xx", "y", "y2", "yes", "yet", "yj", "yl", "you", "youd", "you'd", "you'll", "your", "youre", "you're", "yours", "yourself", "yourselves", "you've", "yr", "ys", "yt", "z", "zero", "zi", "zz"
-                ];
-
-            words.forEach(comment => {
-                const tokens = comment
-                    .split(/\W+/)  // Split on non-word characters
-                    .map(word => word.toLowerCase()) // Convert to lowercase
-                    .filter(word => word.length > 2 && !stopwords.includes(word)); // Filter out short words
-                // console.log(tokens)
-                tokens.forEach(word => {
-                    if (word.length > 2) {  // Ignore short words
-                        wordCounts[word] = (wordCounts[word] || 0) + 1;
-                    }
-                });
-            });
-            console.log(wordCounts)
-
-            const wordArray = Object.keys(wordCounts).map(key => {
-                return { text: key, size: wordCounts[key] * 5 };  // Return the object
-            });
-            console.log(wordArray)
-
-            d3.select("#wordcloud svg").remove();  // Clear previous word cloud
-            const layout = d3.layout.cloud()
-                .size([500, 400])  // Set word cloud size
-                .words(wordArray)
-                .padding(3)
-                .rotate(() => (-45 + Math.random() * 90))
-                .fontSize(d => d.size)
-                .on("end", drawWordCloud);
-
-            layout.start();
-
-            function drawWordCloud(words) {
-                d3.select("#wordcloud")
-                    .append("svg")
-                    .attr("width", layout.size()[0])
-                    .attr("height", layout.size()[1])
-                    .append("g")
-                    .attr("transform", `translate(${layout.size()[0] / 2},${layout.size()[1] / 2})`)
-                    .selectAll("text")
-                    .data(words)
-                    .enter()
-                    .append("text")
-                    .style("font-size", d => `${d.size}px`)
-                    .style("fill", () => d3.schemeCategory10[Math.floor(Math.random() * 10)])
-                    .attr("text-anchor", "middle")
-                    .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
-                    .text(d => d.text);
-            }
-        }
+        updateChart("palestine_sentiment.csv");
     </script>
 </body>
 </html>
