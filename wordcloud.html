@@ -27,11 +27,49 @@
         button:hover {
             background-color: #0056b3;
         }
+        #table-container {
+            margin: 20px auto;
+            width: 50%;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        #comments-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #comments-table th, #comments-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #comments-table th {
+            background-color: #f2f2f2;
+        }
+        #loading {
+            width:100%;
+            height:100%;
+            position:fixed;
+            z-index:9999;
+            background:url("./loading.gif") no-repeat center center rgba(0,0,0,0.25)
+        }
     </style>
 </head>
 <body>
+    <div id="loading" style="display: block;"></div>
     <h2 id="wordcloud-title" style="text-align: center;">Word Cloud</h2>
     <div id="wordcloud"></div>
+    <div id="table-container">
+        <table id="comments-table">
+            <thead>
+                <tr>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
     <button onclick="goBack()">Back to Chart</button>
     <script>
         function goBack() {
@@ -57,6 +95,7 @@
             d.date = d3.timeWeek.floor(parseDate(d.created));
             return d;
         }).then(data => {
+            let loading = document.getElementById("loading");
             let filteredData = data.filter(d => d3.timeFormat("%Y-%m-%d")(d.date) === week);
             // only keep data where the emotion parameter is in the 90th percentile or higher for that emotion
             if (emotion) {
@@ -65,8 +104,11 @@
                 filteredData = filteredData.filter(d => d[emotion] >= threshold);
             }
             const comments = filteredData.map(d => d.comment);
-            console.log(comments)
+
             generateWordCloud(comments);
+            generateTable(filteredData);
+
+            loading.style.display = "none";
         });
 
         function generateWordCloud(words) {
@@ -119,6 +161,30 @@
                   .attr("transform", d => `translate(${d.x},${d.y})rotate(${d.rotate})`)
                   .text(d => d.text);
             }
+        }
+
+        function generateTable(data) {
+            // sort data by emotion
+            data.sort((a, b) => b[emotion] - a[emotion]);
+
+            const tbody = d3.select("#comments-table tbody");
+
+            let headers_data = ["Comment", toTitleCase(emotion)];
+
+            const headers = tbody.selectAll("th")
+                .data(headers_data)
+                .enter()
+                .append("th")
+                .text(d => d);
+
+            tbody.selectAll("tr").remove();
+            const rows = tbody.selectAll("tr")
+                .data(data)
+                .enter()
+                .append("tr");
+            
+            rows.append("td").text(d => d.comment);
+            rows.append("td").text(d => parseFloat(d[emotion]).toFixed(3));
         }
     </script>
 </body>

@@ -6,53 +6,53 @@ from torch.utils.data import DataLoader
 import pickle
 
 # Load the data
-# comments = pd.read_pickle('worldnews_comments.pkl')
-# comments['score'] = pd.to_numeric(comments['score'], errors='coerce')
-# comments['body'] = comments['body'].str[:512]
+comments = pd.read_pickle('worldnews_comments.pkl')
+comments['score'] = pd.to_numeric(comments['score'], errors='coerce')
+comments['body'] = comments['body'].str[:512]
 
-# # Filter and preprocess comments
-# comments = comments[comments['score'] > 250]['body'].astype(str)
+# Filter and preprocess comments
+comments = comments[comments['score'] > 250]['body'].astype(str)
 
-# # Load pre-trained tokenizer and model
-# tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-# model = BertModel.from_pretrained('bert-base-uncased')
-# model.eval()  # Set to evaluation mode
+# Load pre-trained tokenizer and model
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+model.eval()  # Set to evaluation mode
 
-# # Use GPU if available
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# model.to(device)
+# Use GPU if available
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.to(device)
 
-# # Reduce to 16-bit precision for faster processing
-# model.half()
+# Reduce to 16-bit precision for faster processing
+model.half()
 
-# # Tokenize the comments
-# encodings = tokenizer(
-#     list(comments),
-#     padding=True,
-#     truncation=True,
-#     max_length=512,
-#     return_tensors="pt"
-# )
+# Tokenize the comments
+encodings = tokenizer(
+    list(comments),
+    padding=True,
+    truncation=True,
+    max_length=512,
+    return_tensors="pt"
+)
 
-# # Create DataLoader for batching
-# batch_size = 100  # Adjust batch size for your GPU memory
-# dataloader = DataLoader(
-#     list(zip(encodings['input_ids'], encodings['attention_mask'])), 
-#     batch_size=batch_size
-# )
+# Create DataLoader for batching
+batch_size = 100  # Adjust batch size for your GPU memory
+dataloader = DataLoader(
+    list(zip(encodings['input_ids'], encodings['attention_mask'])), 
+    batch_size=batch_size
+)
 
-# # Process embeddings and save after each batch
+# Process embeddings and save after each batch
 output_file = '16bit_embeddings.pt'
-# with torch.no_grad():
-#     for i, (input_ids, attention_mask) in enumerate(tqdm(dataloader, desc="Generating Embeddings")):
-#         # Move data to GPU
-#         input_ids, attention_mask = input_ids.to(device), attention_mask.to(device)
+with torch.no_grad():
+    for i, (input_ids, attention_mask) in enumerate(tqdm(dataloader, desc="Generating Embeddings")):
+        # Move data to GPU
+        input_ids, attention_mask = input_ids.to(device), attention_mask.to(device)
 
-#         # Generate embeddings
-#         batch_embeddings = model(input_ids, attention_mask=attention_mask)[0].cpu()  # Move results back to CPU
+        # Generate embeddings
+        batch_embeddings = model(input_ids, attention_mask=attention_mask)[0].cpu()  # Move results back to CPU
         
-#         # Save embeddings for the batch
-#         torch.save(batch_embeddings, f"embeddings/embeddings_16bit_batch_{i}.pt")
+        # Save embeddings for the batch
+        torch.save(batch_embeddings, f"embeddings/embeddings_16bit_batch_{i}.pt")
 
 # Combine all batch files if needed (optional)
 import glob
