@@ -48,6 +48,22 @@
             height: 500px;
         }
 
+        #legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        max-width: 960px; /* Match the chart width */
+        margin: 20px auto 0; /* Space below the chart */
+        padding: 10px;
+        border: 1px solid #ccc;
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        }
+        #legend div {
+            margin: 5px 10px; /* Space between legend items */
+        }
+
         #line-chart {
             display: flex;
             justify-content: center;
@@ -72,6 +88,7 @@
             z-index:9999;
             background:url("./loading.gif") no-repeat center center rgba(0,0,0,0.25)
         }
+
     </style>
 </head>
 <body>
@@ -90,6 +107,7 @@
         </select>
     </div>
     <div id="area-chart"></div>
+    <div id="legend"></div>
     <h4 id="linechart-title">'Biden' Mentions by Week</h4>
     <div id="line-chart"></div>
     <div id="area-tooltip" class="area-tooltip" style="opacity: 0;"></div>
@@ -145,7 +163,38 @@
                 const y = d3.scaleLinear()
                             .domain([0, 1])
                             .range([height, 0]);
-                const color = d3.scaleOrdinal(d3.schemeCategory10);
+                // const color = d3.scaleOrdinal(d3.schemeCategory10);
+                const emotionColors = {
+                    neutral: "#808080",           // Gray: balance, neutrality
+                    disappointment: "#a50026",   // Dark red: deep sorrow
+                    sadness: "#6e6e6e",          // Dark gray: sadness, melancholy
+                    annoyance: "#ff7f00",        // Orange: irritation
+                    disapproval: "#b22222",      // Firebrick red: authoritative rejection
+                    realization: "#66c2a5",      // Teal: clarity and insight
+                    approval: "#1a9850",         // Green: acceptance, positivity
+                    optimism: "#ffc107",         // Golden yellow: hopeful and positive
+                    disgust: "#5e3c99",          // Purple: repulsion
+                    nervousness: "#ffcccb",      // Pale coral: subtle anxiety
+                    fear: "#762a83",             // Deep violet: fear, tension
+                    amusement: "#ff1493",        // Deep pink: vibrant playfulness
+                    embarrassment: "#ff6347",    // Tomato red: flushed, flustered feeling
+                    joy: "#ffff00",              // Bright yellow: pure happiness
+                    anger: "#e31a1c",            // Bright red: intense and vivid anger
+                    desire: "#f46d43",           // Orange-red: passion and longing
+                    caring: "#ffa07a",           // Light salmon: warmth and nurturing
+                    remorse: "#999999",          // Light gray: regret, sorrow
+                    relief: "#3288bd",           // Blue-green: calm relief
+                    excitement: "#ff4500",       // Bright orange-red: energetic enthusiasm
+                    grief: "#542788",            // Deep purple: deep mourning
+                    admiration: "#74add1",       // Light blue: awe and respect
+                    surprise: "#8a2be2",         // Blue-violet: unexpected energy
+                    confusion: "#abdda4",        // Light green: puzzlement
+                    love: "#ff69b4",             // Hot pink: affectionate love
+                    curiosity: "#1f78b4",        // Deep blue: inquisitiveness
+                    pride: "#ffd700",            // Metallic gold: confident pride
+                    gratitude: "#6a3d9a"         // Purple: sincerity and thanks
+                };
+                const color = d => emotionColors[d] || "#000000";
 
                 const area = d3.area()
                                .x(d => x(d.data.date))
@@ -212,6 +261,44 @@
                 svg.append("g")
                    .attr("class", "y-axis")
                    .call(d3.axisLeft(y));
+
+                // Create the legend container
+                let legendContainer = d3.select("#legend");
+
+                if (legendContainer.empty()) {
+                    legendContainer = d3.select("body")
+                        .append("div")
+                        .attr("id", "legend")
+                        .style("display", "flex")
+                        .style("flex-wrap", "wrap")
+                        .style("justify-content", "center")
+                        .style("margin-top", "20px");
+                }
+
+                // Clear existing legend items
+                legendContainer.selectAll("*").remove();
+
+                // Add legend items
+                Object.entries(emotionColors).forEach(([emotion, color]) => {
+                    const legendItem = legendContainer.append("div")
+                        .style("display", "flex")
+                        .style("align-items", "center")
+                        .style("margin", "5px");
+
+                    // Add color box
+                    legendItem.append("div")
+                        .style("width", "15px")
+                        .style("height", "15px")
+                        .style("margin-right", "8px")
+                        .style("background-color", color);
+
+                    // Add emotion label
+                    legendItem.append("span")
+                        .text(emotion)
+                        .style("font-size", "12px")
+                        .style("color", "#333");
+                });
+
             });
         }
 
