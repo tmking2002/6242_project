@@ -116,7 +116,7 @@
                 );
 
                 if (!response.ok) {
-                    throw new Error(`Server error: ${response.statusText}`);
+                    throw new Error(`Server error: ${response.statusText}, adjust your prompt to include the frequency (monthly or weekly), the kind of graph (bar graph or line chart), and time frame such as over the summer of 2024, from January to March, etc.`);
                 }
 
                 const data = await response.json();
