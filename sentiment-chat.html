@@ -10,14 +10,23 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .chat-container {
             max-width: 600px;
-            margin: 0 auto;
             text-align: left;
+            margin-top: 20px;
         }
 
         .chat-container h1 {
@@ -41,14 +50,14 @@
             padding: 10px;
             font-size: 16px;
             cursor: pointer;
-            background-color: #28a745;
+            background-color: #FF4500;
             color: white;
             border: none;
             border-radius: 5px;
         }
 
         .chat-box button:hover {
-            background-color: #218838;
+            background-color: #d93c00;
         }
 
         #loading-indicator {
@@ -60,25 +69,46 @@
         #chart {
             margin-top: 20px;
         }
+
+        footer {
+            background-color: #f6f7f8;
+            text-align: center;
+            padding: 10px 0;
+            color: #878a8c;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+
+        footer a {
+            color: #FF4500;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
-    <a href="index.html" style="position: absolute; top: 20px; left: 20px; text-decoration: none; font-size: 16px; color: #007bff;">
+    <a href="index.html" style="position: absolute; top: 20px; left: 20px; text-decoration: none; font-size: 16px; color: gray;">
       &larr; Back to Home
     </a>
-    <div class="chat-container">
-        <h1>Sentiment Analysis Chat</h1>
-        <div class="chat-box">
-            <input
-                type="text"
-                id="userQuery"
-                placeholder="E.g. Line plot for Kamala Harris vs Trump for disapproval and approval from August to October by week"
-            />
-            <button id="sendButton">Generate Visualization</button>
-            <div id="loading-indicator" style="display: none;">Loading, please wait...</div>
+    <div class="content">
+        <div class="chat-container">
+            <h1>Sentiment Analysis Chat</h1>
+            <div class="chat-box">
+                <input
+                    type="text"
+                    id="userQuery"
+                    placeholder="E.g. Line plot for Kamala Harris vs Trump for disapproval and approval from August to October by week"
+                />
+                <button id="sendButton">Generate Visualization</button>
+                <div id="loading-indicator" style="display: none;">Loading, please wait...</div>
+            </div>
+            <div id="chart"></div>
         </div>
-        <div id="chart"></div>
     </div>
+    <footer>
+        <p>
+            Built by Team 29 for CSE 6242: Data Visualization & Analytics.
+        </p>
+    </footer>
 
     <script>
         // Get references to elements
@@ -86,6 +116,7 @@
         const userQueryInput = document.getElementById("userQuery");
         const loadingIndicator = document.getElementById("loading-indicator");
         const chartContainer = document.getElementById("chart");
+        const footer = document.querySelector("footer");
 
         sendButton.addEventListener("click", async () => {
             const query = userQueryInput.value;
@@ -134,6 +165,9 @@
                         div.innerHTML = `<p>Error embedding chart ${index + 1}: ${err.message}</p>`;
                     });
                 });
+
+                // Move footer to below the chart
+                footer.style.position = "relative";
             } catch (error) {
                 console.error("Error:", error);
                 chartContainer.innerHTML = `<p>Error: ${error.message}</p>`;

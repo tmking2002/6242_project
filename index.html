@@ -1,66 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sentiment Analysis Dashboard</title>
+    <title>Reddit r/worldnews Temporal Sentiment Analysis</title>
     <style>
+        /* General Styling */
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
+            margin: 0;
+            padding: 0;
+            background-color: #f6f7f8; /* Reddit-like background */
+            color: #1a1a1b; /* Reddit text color */
+        }
+
+        header {
+            background-color:  #FF4500; /* Reddit Orange */
             padding: 20px;
+            text-align: center;
+            color: white;
+            position: relative;
         }
 
-        h1 {
-            margin-bottom: 20px;
+        header img {
+            position: absolute;
+            left: 20px;
+            top: 10px;
+            width: 75px;
+            height: 75px;
         }
 
-        .description {
-            font-size: 18px;
-            margin-bottom: 40px;
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        header p {
+            margin: 10px 0 0;
+            font-size: 1.1rem;
+        }
+
+        main {
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        section h2 {
+            color: #FF4500; /* Reddit Orange */
+            border-bottom: 2px solid #FF4500;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        section p {
+            line-height: 1.6;
         }
 
         .button-container {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
+            text-align: center;
+            margin-top: 20px;
         }
 
-        .button {
-            padding: 15px 30px;
-            font-size: 18px;
+        .button-container a {
+            display: inline-block;
+            background-color: #FF4500;
             color: white;
             text-decoration: none;
-            border: none;
+            padding: 10px 20px;
             border-radius: 5px;
-            cursor: pointer;
+            font-size: 1rem;
         }
 
-        .visualization-btn {
-            background-color: #007bff;
+        .button-container a:hover {
+            background-color: #d93c00;
         }
 
-        .chat-btn {
-            background-color: #28a745;
+        footer {
+            text-align: center;
+            padding: 10px 0;
+            background-color: #f6f7f8;
+            font-size: 0.9rem;
+            color: #878a8c;
         }
 
-        .wordcloud-btn {
-            background-color: #17a2b8;
+        footer a {
+            color: #FF4500;
+            text-decoration: none;
         }
 
-        .button:hover {
-            opacity: 0.9;
+        footer a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
+
 <body>
-    <h1>Welcome to Sentiment Analysis Dashboard</h1>
-    <p class="description">
-        Explore sentiment data through dynamic visualizations, create custom graphs using our sentiment chat, or view detailed word clouds.
-    </p>
-    <div class="button-container">
-        <a href="main-visualization.html" class="button visualization-btn">Main Visualization</a>
-        <a href="sentiment-chat.html" class="button chat-btn">Sentiment Chat</a>
-    </div>
+    <header>
+        <img src="logo.png" alt="Reddit Logo">
+        <h1>r/worldnews Temporal Sentiment Analysis</h1>
+        <p>Explore public sentiment on global topics with dynamic visualizations and an interactive chat tool</p>
+    </header>
+    <main>
+        <section>
+            <h2>What is this project about?</h2>
+            <p>
+                Reddit is a massive platform where people discuss everything from politics to pop culture. 
+                This project focuses on analyzing the sentiment of Reddit comments from the popular subreddit 
+                <strong>r/worldnews</strong>. By leveraging advanced sentiment analysis and interactive visualizations, 
+                we aim to provide insights into how people feel about key global topics such as Joe Biden, Ukraine, and more.
+            </p>
+        </section>
+
+        <section>
+            <h2>How to use this website?</h2>
+            <p>
+                Navigate through the site to explore interactive charts and visualizations:
+            </p>
+            <ul>
+                <li><strong>Interactive Area Chart:</strong> Select a topic to see how sentiments like joy, anger, and approval changed over time.</li>
+                <li><strong>Word Cloud:</strong> Click on an area chart section to view frequently mentioned words associated with specific emotions and topics.</li>
+                <li><strong>Comment Table:</strong> Review detailed comments that highlight the selected sentiment.</li>
+                <li><strong>Sentiment Chat:</strong> Use our chat interface to generate custom visualizations. Simply type your query, such as:
+                    <em>"Create a line chart for Joe Biden, Trump, and Elon Musk for approval from January to June by week."</em>
+                </li>
+            </ul>
+            <p>
+                The tool is designed to be intuitive and user-friendly, allowing anyone to uncover trends and patterns 
+                in public sentiment with just a few clicks.
+            </p>
+        </section>
+
+        <section>
+            <h2>Explore the Visualizations</h2>
+            <div class="button-container">
+                <a href="main-visualization.html">Go to Main Visualization</a>
+                <a href="sentiment-chat.html" style="margin-left: 10px;">Go to Sentiment Chat</a>
+            </div>
+        </section>
+
+        <section>
+            <h2>Sentiment Chat: Interactive Data Requests</h2>
+            <p>
+                The <strong>Sentiment Chat</strong> allows you to dynamically generate visualizations based on your own queries. 
+                Simply enter a prompt specifying the topic, sentiment, and date range you want to explore, and the system 
+                will create an interactive chart tailored to your request. This feature is perfect for customizing your analysis 
+                and exploring public opinion on your terms.
+            </p>
+            <p>
+                For example, you can ask:
+            </p>
+            <ul>
+                <li>"Show me the weekly sentiment trends for Palestine and Ukraine from May to August."</li>
+                <li>"Create a bar chart comparing Joe Biden and Donald Trump for approval sentiment."</li>
+                <li>"Display a line chart for Elon Musk’s disapproval sentiment from January to December."</li>
+            </ul>
+            <p>
+                Whether you’re a researcher or a curious observer, this tool makes it easy to analyze Reddit sentiment dynamically.
+            </p>
+        </section>
+    </main>
+    <footer>
+        <p>
+            Built by Team 29 for CSE 6242: Data Visualization & Analytics. 
+        </p>
+    </footer>
 </body>
+
 </html>
