@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Visualization</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h2, h4 {
+            margin-bottom: 20px;
+        }
+
+        #area-chart, #line-chart, #legend {
+            margin: 20px auto;
+            max-width: 960px;
+        }
+
+        #legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-item div {
+            width: 15px;
+            height: 15px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background-color: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" style="position: absolute; top: 20px; left: 20px; text-decoration: none; font-size: 16px; color: #007bff;">
+      &larr; Back to Home
+    </a>
+    <h2 id="chart-title">Weekly Average Sentiment - Joe Biden</h2>
+    <div>
+        <label for="dataset-select">Choose a topic:</label>
+        <select id="dataset-select">
+            <option value="biden_sentiment.csv">Joe Biden</option>
+            <option value="china_sentiment.csv">China</option>
+            <option value="musk_sentiment.csv">Elon Musk</option>
+            <option value="lebanon_sentiment.csv">Lebanon</option>
+            <option value="palestine_sentiment.csv">Palestine</option>
+            <option value="trump_sentiment.csv">Donald Trump</option>
+            <option value="ukraine_sentiment.csv">Ukraine</option>
+        </select>
+    </div>
+    <div id="area-chart"></div>
+    <div id="legend"></div>
+    <h4 id="linechart-title">'Joe Biden' Mentions by Week</h4>
+    <div id="line-chart"></div>
+    <div class="tooltip" id="area-tooltip"></div>
+    <div class="tooltip" id="line-tooltip"></div>
+
+    <script>
+      const titleElement = document.getElementById("chart-title");
+      const selectElement = document.getElementById("dataset-select");
+      const linechart_title = document.getElementById("linechart-title");
+
+      selectElement.addEventListener("change", () => {
+          const topic = selectElement.options[selectElement.selectedIndex].text;
+          titleElement.textContent = `Weekly Average Sentiment - ${topic}`;
+          linechart_title.textContent = `'${topic}' Mentions by Week`;
+          updateChart(selectElement.value);
+      });
+
+      const margin = { top: 20, right: 30, bottom: 50, left: 50 },
+            width = 960 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+      const svg = d3.select("#area-chart")
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      const parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
+      const area_tooltip = d3.select("#area-tooltip");
+
+      function updateChart(dataset) {
+          d3.csv(dataset, d => {
+              d.created = parseDate(d.created);
+              d.date = d3.timeWeek.floor(d.created);
+              return d;
+          }).then(data => {
+              const nestedData = d3.groups(data, d => d.date);
+              const weeklyAverageData = nestedData.map(([date, values]) => {
+                  const weeklyAverages = { date: new Date(date), totalComments: values.length };
+                  let emotions = Object.keys(values[0]).filter(k => !["created", "comment", "date"].includes(k));
+                  emotions = emotions.filter(e => e !== "neutral");
+                  const total = d3.sum(values, d => d3.sum(emotions, e => d[e]));
+                  emotions.forEach(e => {
+                      weeklyAverages[e] = total > 0 ? d3.sum(values, d => d[e]) / total : 0;
+                  });
+                  return weeklyAverages;
+              });
+
+              const emotions = Object.keys(weeklyAverageData[0]).filter(k => k !== "date" && k !== "totalComments");
+              const x = d3.scaleTime()
+                          .domain(d3.extent(weeklyAverageData, d => d.date))
+                          .range([0, width]);
+              const y = d3.scaleLinear()
+                          .domain([0, 1])
+                          .range([height, 0]);
+              // const color = d3.scaleOrdinal(d3.schemeCategory10);
+              const emotionColors = {
+                  neutral: "#808080",           // Gray: balance, neutrality
+                  disappointment: "#a50026",   // Dark red: deep sorrow
+                  sadness: "#6e6e6e",          // Dark gray: sadness, melancholy
+                  annoyance: "#ff7f00",        // Orange: irritation
+                  disapproval: "#b22222",      // Firebrick red: authoritative rejection
+                  realization: "#66c2a5",      // Teal: clarity and insight
+                  approval: "#1a9850",         // Green: acceptance, positivity
+                  optimism: "#ffc107",         // Golden yellow: hopeful and positive
+                  disgust: "#5e3c99",          // Purple: repulsion
+                  nervousness: "#ffcccb",      // Pale coral: subtle anxiety
+                  fear: "#762a83",             // Deep violet: fear, tension
+                  amusement: "#ff1493",        // Deep pink: vibrant playfulness
+                  embarrassment: "#ff6347",    // Tomato red: flushed, flustered feeling
+                  joy: "#ffff00",              // Bright yellow: pure happiness
+                  anger: "#e31a1c",            // Bright red: intense and vivid anger
+                  desire: "#f46d43",           // Orange-red: passion and longing
+                  caring: "#ffa07a",           // Light salmon: warmth and nurturing
+                  remorse: "#999999",          // Light gray: regret, sorrow
+                  relief: "#3288bd",           // Blue-green: calm relief
+                  excitement: "#ff4500",       // Bright orange-red: energetic enthusiasm
+                  grief: "#542788",            // Deep purple: deep mourning
+                  admiration: "#74add1",       // Light blue: awe and respect
+                  surprise: "#8a2be2",         // Blue-violet: unexpected energy
+                  confusion: "#abdda4",        // Light green: puzzlement
+                  love: "#ff69b4",             // Hot pink: affectionate love
+                  curiosity: "#1f78b4",        // Deep blue: inquisitiveness
+                  pride: "#ffd700",            // Metallic gold: confident pride
+                  gratitude: "#6a3d9a"         // Purple: sincerity and thanks
+              };
+              const color = d => emotionColors[d] || "#000000";
+
+              const area = d3.area()
+                             .x(d => x(d.data.date))
+                             .y0(d => y(d[0]))
+                             .y1(d => y(d[1]));
+
+              const stack = d3.stack().keys(emotions);
+              const stackedData = stack(weeklyAverageData);
+
+              svg.selectAll(".area").remove();
+              svg.selectAll(".x-axis").remove();
+              svg.selectAll(".y-axis").remove();
+
+              svg.selectAll(".area")
+                 .data(stackedData)
+                 .enter()
+                 .append("path")
+                 .attr("class", "area")
+                 .attr("d", area)
+                 .attr("fill", d => color(d.key))
+                 .style("opacity", 0.7)
+                 .on("mousemove", (event, d) => {
+                     const [xPos] = d3.pointer(event, svg.node());
+                     const date = x.invert(xPos);
+                     const closestWeek = findClosestWeek(date, weeklyAverageData);
+                     const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
+
+                     const dataAtDate = closestWeek;
+                     const emotion = d.key;
+                     const score = dataAtDate ? dataAtDate[emotion] : 0;
+                     const totalComments = dataAtDate ? dataAtDate.totalComments : 0;
+
+                     area_tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
+                                   <strong>Emotion:</strong> ${emotion}<br>
+                                   <strong>Score:</strong> ${score.toFixed(2)}<br>
+                                   <strong>Total Comments:</strong> ${totalComments}<br><br>
+                                   Click to view word cloud`)
+                            .style("left", `${event.pageX + 15}px`)
+                            .style("top", `${event.pageY - 30}px`)
+                            .style("opacity", 1);
+                 })
+                 .on("mouseout", () => area_tooltip.style("opacity", 0))
+                 .on("click", (event, d) => {
+                     const [xPos] = d3.pointer(event, svg.node());
+                     const date = x.invert(xPos);
+                     const closestWeek = findClosestWeek(date, weeklyAverageData);
+                     const weekDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
+                     const dataset = selectElement.value;
+                     const topic = selectElement.options[selectElement.selectedIndex].text;
+                     const emotion = d.key;
+
+                     // Redirect to the wordcloud page with query params
+                     const url = `wordcloud.html?dataset=${dataset}&week=${weekDate}&topic=${topic}&emotion=${emotion}`;
+                     window.location.href = url;
+                 });
+
+              svg.append("g")
+                 .attr("class", "x-axis")
+                 .attr("transform", `translate(0,${height})`)
+                 .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1)))
+                 .selectAll("text")
+                 .attr("transform", "rotate(-45)")
+                 .style("text-anchor", "end");
+
+              svg.append("g")
+                 .attr("class", "y-axis")
+                 .call(d3.axisLeft(y));
+
+              // Create the legend container
+              let legendContainer = d3.select("#legend");
+
+              if (legendContainer.empty()) {
+                  legendContainer = d3.select("body")
+                      .append("div")
+                      .attr("id", "legend")
+                      .style("display", "flex")
+                      .style("flex-wrap", "wrap")
+                      .style("justify-content", "center")
+                      .style("margin-top", "20px");
+              }
+
+              // Clear existing legend items
+              legendContainer.selectAll("*").remove();
+
+              // Add legend items
+              Object.entries(emotionColors).forEach(([emotion, color]) => {
+                  const legendItem = legendContainer.append("div")
+                      .style("display", "flex")
+                      .style("align-items", "center")
+                      .style("margin", "5px");
+
+                  // Add color box
+                  legendItem.append("div")
+                      .style("width", "15px")
+                      .style("height", "15px")
+                      .style("margin-right", "8px")
+                      .style("background-color", color);
+
+                  // Add emotion label
+                  legendItem.append("span")
+                      .text(emotion)
+                      .style("font-size", "12px")
+                      .style("color", "#333");
+              });
+
+          });
+      }
+
+      function findClosestWeek(date, weeklyData) {
+          let closest = weeklyData[0];
+          let minDiff = Math.abs(date - closest.date);
+          weeklyData.forEach(week => {
+              const diff = Math.abs(date - week.date);
+              if (diff < minDiff) {
+                  closest = week;
+                  minDiff = diff;
+              }
+          });
+          return closest;
+      }
+
+      const lineChartMargin = { top: 20, right: 30, bottom: 50, left: 50 },
+        lineChartWidth = 960 - lineChartMargin.left - lineChartMargin.right,
+        lineChartHeight = 300 - lineChartMargin.top - lineChartMargin.bottom;
+
+      const lineChartSvg = d3.select("#line-chart")
+                          .append("svg")
+                          .attr("width", lineChartWidth + lineChartMargin.left + lineChartMargin.right)
+                          .attr("height", lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
+                          .append("g")
+                          .attr("transform", `translate(${lineChartMargin.left},${lineChartMargin.top})`);
+
+      const line_tooltip = d3.select("#line-tooltip");
+
+      function updateLineChart(dataset) {
+          d3.csv(dataset, d => {
+              d.created = parseDate(d.created);
+              d.date = d3.timeWeek.floor(d.created);
+              return d;
+          }).then(data => {
+              const nestedData = d3.groups(data, d => d.date);
+              const weeklyTotalData = nestedData.map(([date, values]) => ({
+                  date: new Date(date),
+                  totalComments: values.length
+              }));
+
+              const x = d3.scaleTime()
+                          .domain(d3.extent(weeklyTotalData, d => d.date))
+                          .range([0, lineChartWidth]);
+              const y = d3.scaleLinear()
+                          .domain([0, d3.max(weeklyTotalData, d => d.totalComments)])
+                          .range([lineChartHeight, 0]);
+
+              const line = d3.line()
+                          .x(d => x(d.date))
+                          .y(d => y(d.totalComments));
+
+              lineChartSvg.selectAll(".line").remove();
+              lineChartSvg.selectAll(".line-x-axis").remove();
+              lineChartSvg.selectAll(".line-y-axis").remove();
+
+              lineChartSvg.append("path")
+                          .datum(weeklyTotalData)
+                          .attr("class", "line")
+                          .attr("fill", "none")
+                          .attr("stroke", "steelblue")
+                          .attr("stroke-width", 10)
+                          .attr("d", line);
+
+              lineChartSvg.append("rect")
+                          .attr("width", lineChartWidth)
+                          .attr("height", lineChartHeight)
+                          .attr("fill", "none")
+                          .attr("pointer-events", "all")
+                          .on("mousemove", (event) => {
+                              const [xPos] = d3.pointer(event, lineChartSvg.node());
+                              const date = x.invert(xPos);
+                              const closestWeek = findClosestWeek(date, weeklyTotalData);
+                              const roundedDate = d3.timeFormat("%Y-%m-%d")(closestWeek.date);
+
+                              const dataAtDate = closestWeek;
+                              const totalComments = dataAtDate ? dataAtDate.totalComments : 0;
+
+                              line_tooltip.html(`<strong>Date:</strong> ${roundedDate}<br>
+                                          <strong>Total Comments:</strong> ${totalComments}`)
+                                  .style("left", `${event.pageX + 15}px`)
+                                  .style("top", `${event.pageY - 30}px`)
+                                  .style("opacity", 1);
+                          })
+                          .on("mouseout", () => line_tooltip.style("opacity", 0));
+
+              lineChartSvg.selectAll(".line").remove();
+              lineChartSvg.selectAll(".line-x-axis").remove();
+              lineChartSvg.selectAll(".line-y-axis").remove();
+
+              lineChartSvg.append("path")
+                          .datum(weeklyTotalData)
+                          .attr("class", "line")
+                          .attr("fill", "none")
+                          .attr("stroke", "steelblue")
+                          .attr("stroke-width", 1.5)
+                          .attr("d", line);
+
+              lineChartSvg.append("g")
+                          .attr("class", "line-x-axis")
+                          .attr("transform", `translate(0,${lineChartHeight})`)
+                          .call(d3.axisBottom(x).ticks(d3.timeWeek.every(1)))
+                          .selectAll("text")
+                          .attr("transform", "rotate(-45)")
+                          .style("text-anchor", "end");
+
+              lineChartSvg.append("g")
+                          .attr("class", "line-y-axis")
+                          .call(d3.axisLeft(y));
+          });
+      }
+
+      selectElement.addEventListener("change", () => {
+          updateLineChart(selectElement.value);
+      });
+
+
+      updateChart("biden_sentiment.csv");
+      updateLineChart("biden_sentiment.csv");
+      let loading = document.getElementById("loading");
+      loading.style.display = "none";
+  </script>
+</body>
+</html>
